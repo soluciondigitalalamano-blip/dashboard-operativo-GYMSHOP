@@ -254,7 +254,7 @@ with tab1:
         },
         hide_index=True,
         use_container_width=True,
-        height=420
+        height=(len(df_display) * 35 + 38)
     )
 
 
