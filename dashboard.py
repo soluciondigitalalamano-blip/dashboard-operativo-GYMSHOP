@@ -65,11 +65,15 @@ st.markdown(custom_css, unsafe_allow_html=True)
 # En Streamlit Cloud el app corre desde el root del repo, no desde la carpeta del archivo
 _THIS_FILE = Path(__file__).resolve()
 _CANDIDATES = [
-    _THIS_FILE.parent / "data",          # local: app.py está junto a /data
-    Path(os.getcwd()) / "data",          # Streamlit Cloud: CWD es el root del repo
-    Path(os.getcwd()) / "gym_dashboard" / "data",  # si el repo tiene subcarpeta
+    Path(os.getcwd()),                       # raiz del repo (Streamlit Cloud, CSV sueltos)
+    _THIS_FILE.parent,                       # mismo directorio que dashboard.py
+    Path(os.getcwd()) / "data",             # subcarpeta data/ en raiz
+    _THIS_FILE.parent / "data",             # subcarpeta data/ junto al script
 ]
-DATA_DIR = next((p for p in _CANDIDATES if p.exists()), _THIS_FILE.parent / "data")
+DATA_DIR = next(
+    (p for p in _CANDIDATES if (p / "operaciones.csv").exists()),
+    Path(os.getcwd())
+)
  
 @st.cache_data(ttl=300)  # Refresca cada 5 minutos si el archivo cambia
 def load_data():
