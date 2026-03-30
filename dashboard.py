@@ -1,138 +1,482 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
+import plotly.express as px
 
-# --- CONFIGURACIÓN DE LA PÁGINA ---
-st.set_page_config(layout="wide", page_title="Dashboard Operativo y Soporte")
+# 1. Configuración de la página (Modo oscuro y layout ancho)
+st.set_page_config(layout="wide", page_title="Cuadro Técnicos Semanal")
 
-# --- ESTILOS CSS ---
-st.markdown("""
-    <style>
-    .main-title { font-size:32px !important; font-weight: bold; color: #1E3A8A; text-align: left; margin-bottom: 5px; }
-    .section-header { 
-        background-color: #F8FAFC; 
-        padding: 10px; 
-        border-left: 5px solid #1E3A8A; 
-        font-weight: bold; 
-        color: #1E3A8A; 
-        margin-top: 30px; 
-        margin-bottom: 15px; 
+# 2. Carga y Preprocesamiento de Datos desde image_12.png
+# Se copian manualmente los datos exactos del "CSV" de image_12.png
+raw_data = {
+    'Técnico': [
+        'CONTRERAS CORZO JAVIER ALEXANDER', 'JESUS ARMANDO JOYA DIAZ', 'VARGAS RESTREPO ANDRES FELIPE',
+        'ACOSTA MARTINEZ OSMAN OMAR', 'RONCANCIO BELTRAN WILSON EMEIRO', 'LOPEZ GIRALDO JAMIR',
+        'GOMEZ CARDENAS MAURICIO', 'RODRIGUEZ CESAR AUGUSTO', 'CARDOZO CASTRO EDGAR GIOVANNY',
+        'JIMENEZ VELOZA LUCINIO IVAN', 'JAVIER ESTIVEN MORA', 'VANEGAS YONI ALBEIRO',
+        'ROMERO SERRANO LUIS MIGUEL', 'PAJARO ESCORCIA MARTIN', 'RIOS ARANGO ADRIAN ALONSO'
+    ],
+    'Visitas registradas': [5, 1, 2, 0, 0, 1, 2, 3, 4, 2, 1, 0, 2, 2, 1],
+    'Agenda semana pasada': [6, 4, 2, 2, 5, 5, 6, 7, 3, 5, 6, 4, 4, 4, 2],
+    '% de visitas vs agenda': [
+        '83.3 %', '25.0 %', '100.0 %', '0.0 %', '0.0 %', '20.0 %', '33.3 %', '42.9 %',
+        '133.3 %', '40.0 %', '16.7 %', '0.0 %', '50.0 %', '50.0 %', '50.0 %'
+    ],
+    'Gastos': [
+        '590.650 COP', '0 COP', '86.900 COP', '0 COP', '0 COP', '30.000 COP', '36.400 COP',
+        '0 COP', '51.000 COP', '45.000 COP', '37.100 COP', '0 COP', '0 COP', '0 COP', '18.000 COP'
+    ],
+    'Cantidad de ventas reportada': [4, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 2, 2, 1],
+    'Servicios agendados esta semana': [2, 4, 4, 4, 1, 4, 3, 3, 1, 3, 1, 0, 0, 0, 0]
+}
+
+# Crear DataFrame
+df = pd.DataFrame(raw_data)
+
+# Preprocesar datos numéricos para cálculos
+# Función para limpiar cadenas de moneda (COP) a números
+def clean_cop(str_val):
+    if not isinstance(str_val, str): return str_val
+    clean_val = str_val.replace('COP', '').replace('.', '').strip()
+    return int(clean_val) if clean_val else 0
+
+df['Gastos_num'] = df['Gastos'].apply(clean_cop)
+# Convertir % cadenas a números decimales
+df['% Cumplimiento_num'] = df['% de visitas vs agenda'].str.replace(' %', '').astype(float) / 100
+
+# 3. Recalcular métricas principales basadas en los nuevos datos de image_12.png
+total_ventas = df['Cantidad de ventas reportada'].sum()
+total_gastos = df['Gastos_num'].sum()
+# Calcular cumplimiento promedio total como Sum(Visitas) / Sum(Agenda) para mayor precisión
+total_visitas = df['Visitas registradas'].sum()
+total_agenda = df['Agenda semana pasada'].sum()
+cumplimiento_promedio = (total_visitas / total_agenda) * 100 if total_agenda > 0 else 0
+
+# 4. Definir CSS personalizado para estilos oscuros y bordes redondeados
+# Nota: La estructura HTML de Streamlit es compleja. Estos estilos son una aproximación.
+custom_css = """
+<style>
+    /* Estilos globales */
+    body {
+        background-color: #121212 !important;
+        color: #f0f0f0 !important;
+        font-family: sans-serif !important;
     }
-    .kpi-rojo {
-        background-color: #FEE2E2; 
-        border: 1px solid #EF4444; 
-        padding: 15px; 
+    h1, h2, h3 {
+        color: white !important;
+    }
+    
+    /* Paneles de tarjetas */
+    .dashboard-panel {
+        background-color: #1a1a1a;
         border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    }
+    
+    /* Métricas principales */
+    .metric-card-container {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        color: #f0f0f0;
+    }
+    .metric-value {
+        font-size: 36px;
+        font-weight: bold;
+        color: white;
+    }
+    .metric-label {
+        font-size: 14px;
+        color: #a0a0a0;
+        margin-bottom: 10px;
+    }
+    .trend-positive {
+        color: #50e3c2; /* Color verde del trend */
+        font-size: 14px;
+    }
+    .trend-negative {
+        color: #f0f0f0; /* Color gris claro del trend negativo */
+        font-size: 14px;
+    }
+    
+    /* Tickets cards */
+    .ticket-card {
+        background-color: #1a1a1a;
+        border-radius: 10px;
+        padding: 20px;
+        margin: 10px;
+        color: #f0f0f0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
         text-align: center;
     }
-    </style>
-    """, unsafe_allow_html=True)
-
-# ==========================================
-# SECCIÓN 1: RESUMEN TÉCNICOS
-# ==========================================
-st.markdown('<p class="main-title">📊 Resumen Técnicos</p>', unsafe_allow_html=True)
-
-# 1. Carga de TODOS los datos de la imagen original
-@st.cache_data
-def load_data():
-    data = {
-        'Técnico': [
-            'CONTRERAS CORZO JAVIER ALEXANDER', 'JESUS ARMANDO JOYA DIAZ', 'VARGAS RESTREPO ANDRES FELIPE', 
-            'ACOSTA MARTINEZ OSMAN OMAR', 'RONCANCIO BELTRAN WILSON EMEIRO', 'LOPEZ GIRALDO JAMIR', 
-            'GOMEZ CARDENAS MAURICIO', 'RODRIGUEZ CESAR AUGUSTO', 'CARDOZO CASTRO EDGAR GIOVANNY', 
-            'JIMENEZ VELOZA LUCINIO IVAN', 'JAVIER ESTIVEN MORA', 'VANEGAS YONI ALBEIRO', 
-            'ROMERO SERRANO LUIS MIGUEL', 'PAJARO ESCORCIA MARTIN', 'RIOS ARANGO ADRIAN ALONSO'
-        ],
-        'Visitas Registradas': [5, 1, 2, 0, 0, 1, 2, 3, 4, 2, 1, 0, 2, 2, 1],
-        'Agenda Semana Pasada': [6, 4, 2, 2, 5, 5, 6, 7, 3, 5, 6, 4, 4, 4, 2],
-        '% Visitas vs Agenda': [83.3, 25.0, 100.0, 0.0, 0.0, 20.0, 33.3, 42.9, 133.3, 40.0, 16.7, 0.0, 50.0, 50.0, 50.0],
-        'Gastos (COP)': [590650, 0, 86900, 0, 0, 30000, 36400, 0, 51000, 45000, 37100, 0, 0, 0, 18000],
-        'Ventas Reportadas': [4, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 2, 2, 1],
-        'Servicios Agendados Esta Sem': [2, 4, 4, 4, 1, 4, 3, 3, 1, 3, 1, 0, 0, 0, 0] # Columna recuperada
+    .ticket-card.red { border: 2px solid #ff4b4b; }
+    .ticket-card.orange { border: 2px solid #ff9f43; }
+    .ticket-card.blue { border: 2px solid #3b82f6; }
+    .ticket-value {
+        font-size: 64px;
+        font-weight: bold;
     }
-    return pd.DataFrame(data)
-
-df = load_data()
-
-# 2. Filtros en la barra lateral
-st.sidebar.header("Filtros de Análisis")
-selected_tecnicos = st.sidebar.multiselect(
-    "Filtrar por Técnico:",
-    options=sorted(df['Técnico'].unique()),
-    default=sorted(df['Técnico'].unique())
-)
-
-df_filtered = df[df['Técnico'].isin(selected_tecnicos)]
-
-# 3. KPIs de Técnicos
-col1, col2, col3 = st.columns(3)
-with col1:
-    st.metric("Total Ventas Reportadas", f"{df_filtered['Ventas Reportadas'].sum()} u.")
-with col2:
-    gastos_totales = df_filtered['Gastos (COP)'].sum()
-    st.metric("Total Gastos", f"${gastos_totales:,.0f} COP".replace(",", "."))
-with col3:
-    v_totales = df_filtered['Visitas Registradas'].sum()
-    a_totales = df_filtered['Agenda Semana Pasada'].sum()
-    cumplimiento = (v_totales / a_totales * 100) if a_totales > 0 else 0
-    st.metric("% Cumplimiento Promedio", f"{cumplimiento:.1f}%")
-
-# 4. Gráfico y Tabla
-col_graf, col_tabla = st.columns([1.5, 2]) # Dividimos la pantalla para mejor uso del espacio
-
-with col_graf:
-    st.markdown("**Comparativa: Visitas vs Agenda**")
-    fig_bar = go.Figure()
-    fig_bar.add_trace(go.Bar(x=df_filtered['Técnico'], y=df_filtered['Visitas Registradas'], name='Visitas Registradas', marker_color='#1E3A8A'))
-    fig_bar.add_trace(go.Bar(x=df_filtered['Técnico'], y=df_filtered['Agenda Semana Pasada'], name='Agenda Planificada', marker_color='#94A3B8'))
-    fig_bar.update_layout(barmode='group', height=350, margin=dict(t=10, b=10, l=10, r=10), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
-    st.plotly_chart(fig_bar, use_container_width=True)
-
-with col_tabla:
-    st.markdown("**Detalle Operativo**")
-    # Formatear gastos para la vista
-    df_display = df_filtered.copy()
-    df_display['Gastos (COP)'] = df_display['Gastos (COP)'].apply(lambda x: f"${x:,.0f}".replace(",", "."))
-    st.dataframe(df_display, use_container_width=True, hide_index=True, height=350)
-
-
-# ==========================================
-# SECCIÓN 2: TICKETS ZOHO DESK
-# ==========================================
-st.markdown('<div class="section-header">🎫 Tickets de Soporte Zoho Desk</div>', unsafe_allow_html=True)
-
-col_t1, col_t2, col_t3, col_t4 = st.columns([1, 1, 1, 1.5])
-
-with col_t1:
-    st.metric(label="Nuevos / Abiertos", value="18", delta="Sin Respuesta", delta_color="off")
-    st.caption("Requieren primera atención.")
-
-with col_t2:
-    # KPI Crítico
-    st.markdown('<div class="kpi-rojo">'
-                '<h4 style="color: #B91C1C; margin:0;">⚠️ Vencidos (SLA)</h4>'
-                '<h2 style="color: #B91C1C; margin:0; font-size: 36px;">7</h2>'
-                '</div>', unsafe_allow_html=True)
-
-with col_t3:
-    st.metric(label="Pendientes Cierre", value="15", delta="Sin fecha entrega", delta_color="off")
-    st.caption("En proceso pero sin cerrar.")
-
-with col_t4:
-    # Gráfico de Dona
-    labels = ['Vencidos (SLA)', 'Abiertos (Sin Resp.)', 'Pendientes Cierre']
-    values = [7, 18, 15]
-    colors = ['#EF4444', '#3B82F6', '#F59E0B']
+    .ticket-label {
+        font-size: 14px;
+        font-weight: bold;
+    }
+    .ticket-desc {
+        font-size: 12px;
+        color: #a0a0a0;
+    }
     
-    fig_pie = go.Figure(data=[go.Pie(labels=labels, values=values, hole=.5, marker_colors=colors)])
-    fig_pie.update_layout(
-        height=200, 
-        margin=dict(t=10, b=10, l=10, r=10),
-        showlegend=True,
-        legend=dict(orientation="v", y=0.5, x=1.1)
-    )
-    st.plotly_chart(fig_pie, use_container_width=True)
+    /* Footer */
+    .dashboard-footer {
+        color: #a0a0a0;
+        font-size: 10px;
+        padding: 10px;
+        text-align: center;
+    }
+    
+    /* Ajustes menores de espaciado */
+    div[data-testid="stVerticalBlock"] > div:has(div.metric-card-container) {
+        padding: 0px !important;
+    }
+    div[data-testid="stContainer"] {
+        background-color: transparent !important;
+    }
+    
+    /* Banner de tickets */
+    .ticket-banner {
+        background-color: transparent !important;
+        border-bottom: 1px solid #333;
+        margin-bottom: 10px;
+    }
+</style>
+"""
+st.markdown(custom_css, unsafe_allow_html=True)
 
-st.markdown("---")
-st.info("**Prioridad Operativa:** Los 7 tickets vencidos representan un incumplimiento de SLA y deben ser escalados y atendidos con urgencia antes de procesar la cola de 18 tickets abiertos.")
+# 5. Header (Branding, Título, Filtros)
+# Banner superior
+with st.container():
+    col1, col2, col3 = st.columns([1, 4, 2])
+    
+    # Logos de marca
+    with col1:
+        st.markdown(
+            '<div style="color: white; font-weight: bold; font-size: 24px;">GYM <span style="font-size: 10px; vertical-align: super; color: #ff4b4b;">Shop</span><sup>®</sup></div>'
+            '<div style="color: #a0a0a0; font-size: 10px;">Bienestar, Salud & Felicidad</div>'
+            '<div style="color: white; font-size: 10px; margin-top: 5px;">CON MÁS DE <br> <span style="font-size: 16px; font-weight: bold;">30 AÑOS</span> <br> TRAYECTORIA</div>',
+            unsafe_allow_html=True
+        )
+        
+    # Título principal
+    with col2:
+        st.markdown(
+            '<h1 style="text-align: center;">CUADRO TÉCNICOS SEMANAL</h1>',
+            unsafe_allow_html=True
+        )
+        
+    # Info de Techforce y filtros
+    with col3:
+        # Logo de Techforce y fecha
+        st.markdown(
+            '<div style="display: flex; align-items: center; justify-content: flex-end; color: #a0a0a0;">'
+            '<div style="margin-right: 10px;">Techforce SOLUTIONS</div>'
+            '<div style="margin-right: 20px;">1 DE ABRIL, 2026</div>'
+            '</div>',
+            unsafe_allow_html=True
+        )
+        # Controles de filtro (placeholders)
+        f_col1, f_col2 = st.columns(2)
+        with f_col1:
+            st.selectbox("Filtrar por Técnico", ["Todos"], index=0, key="tech_filter", label_visibility="collapsed")
+        with f_col2:
+            st.date_input("Rango de Fecha", label_visibility="collapsed")
+
+# 6. Fila 1: Resumen Técnicos (KPIs + Tabla) y Gráfico de Barras
+col_left, col_right = st.columns([3, 2])
+
+# Columna Izquierda: Panel de Resumen (KPIs + Tabla)
+with col_left:
+    # Contenedor del panel
+    with st.container():
+        st.markdown('<div class="dashboard-panel">', unsafe_allow_html=True)
+        # Título de sección
+        st.markdown('<h3>📈 RESUMEN TÉCNICOS</h3>', unsafe_allow_html=True)
+        
+        # Sub-fila de KPIs
+        kpi_col1, kpi_col2, kpi_col3 = st.columns(3)
+        
+        # Iconos SVG de prueba o unicode
+        icon_ventas = "💳"
+        icon_gastos = "💰"
+        icon_graph = "📊"
+        
+        # KPI 1: Total Ventas Reportadas
+        with kpi_col1:
+            st.markdown(
+                f'<div class="metric-card-container">'
+                f'<div style="font-size: 48px; color: white; margin-bottom: 10px;">{icon_ventas}</div>'
+                f'<div class="metric-label">TOTAL VENTAS REPORTADAS</div>'
+                f'<div class="metric-value">{total_ventas}</div>'
+                f'<div class="trend-positive">📈 +12% vs. mes anterior</div>'
+                f'</div>',
+                unsafe_allow_html=True
+            )
+            
+        # KPI 2: Total Gastos Operativos
+        with kpi_col2:
+            st.markdown(
+                f'<div class="metric-card-container">'
+                f'<div style="font-size: 48px; color: white; margin-bottom: 10px;">{icon_gastos}</div>'
+                f'<div class="metric-label">TOTAL GASTOS OPERATIVOS</div>'
+                f'<div class="metric-value">COP {total_gastos:,.0f}</div>'
+                f'<div class="trend-positive">📉 -5% vs. mes anterior</div>'
+                f'</div>',
+                unsafe_allow_html=True
+            )
+            
+        # KPI 3: % Cumplimiento Promedio
+        with kpi_col3:
+            st.markdown(
+                f'<div class="metric-card-container">'
+                f'<div style="font-size: 48px; color: white; margin-bottom: 10px;">{icon_graph}</div>'
+                f'<div class="metric-label">% CUMPLIMIENTO PROMEDIO (Vs Agenda)</div>'
+                f'<div class="metric-value">{cumplimiento_promedio:.1f}%</div>'
+                f'<div class="trend-positive">📈 +3.1% vs. mes anterior</div>'
+                f'</div>',
+                unsafe_allow_html=True
+            )
+            
+        st.markdown('</div>', unsafe_allow_html=True) # Cierra contenedor de KPIs
+
+    # Contenedor para la tabla detallada
+    with st.container():
+        st.markdown('<div class="dashboard-panel" style="background-color: #1a1a1a;">', unsafe_allow_html=True)
+        st.markdown('<h3>📊 DETALLE DE OPERACIÓN POR TÉCNICO</h3>', unsafe_allow_html=True)
+        
+        # Re-creación de la tabla detallada de image_12.png
+        # Formatear la tabla de datos numéricos para visualización
+        df_display = df.copy()
+        df_display.columns = [
+            'Técnico', 'Visitas', 'Agenda', '% Cumplimiento', 'Gastos', 'Ventas', 'Agendados S.F.'
+        ]
+        # Nota: Los micro-gráficos de barra de la tabla original no son reproducibles con una
+        # tabla Plotly estándar de manera sencilla. Se omiten para esta implementación,
+        # pero se muestran todos los datos correctos para todas las filas.
+        # Mostramos la tabla como un DataFrame estático con formato
+        
+        # Crear tabla Plotly para mayor fidelidad de diseño
+        fig_table = go.Figure(data=[go.Table(
+            header=dict(
+                values=list(df_display.columns),
+                fill_color='#1a1a1a', # Fondo del panel
+                align='left',
+                font=dict(color='white', size=12),
+                line_color='#333' # Bordes
+            ),
+            cells=dict(
+                values=[df_display[col] for col in df_display.columns],
+                fill_color=['#1a1a1a', '#222'] * 15, # Alternar color de fila
+                align='left',
+                font=dict(color='#f0f0f0', size=11),
+                line_color='#333'
+            )
+        )])
+        fig_table.update_layout(
+            margin=dict(l=0, r=0, t=0, b=0),
+            paper_bgcolor='#1a1a1a', # Fondo del panel
+            plot_bgcolor='#1a1a1a'
+        )
+        st.plotly_chart(fig_table, use_container_width=True)
+        
+        st.markdown('</div>', unsafe_allow_html=True) # Cierra contenedor de Tabla
+
+# Columna Derecha: Gráfico de Barras Comparativo
+with col_right:
+    # Contenedor del panel
+    with st.container():
+        st.markdown('<div class="dashboard-panel">', unsafe_allow_html=True)
+        # Título de sección
+        st.markdown('<h3>📊 COMPARATIVA: VISITAS REALES VS. AGENDADAS POR TÉCNICO</h3>', unsafe_allow_html=True)
+        
+        # Preparar datos para el gráfico
+        df_chart = df.copy()
+        # Abreviar nombres de técnicos (primer nombre y inicial del apellido)
+        def shorten_tech_name(full_name):
+            parts = full_name.split()
+            if len(parts) >= 2:
+                return f"{parts[0]} {parts[1][0]}."
+            return parts[0]
+            
+        df_chart['Técnico_Abrev'] = df_chart['Técnico'].apply(shorten_tech_name)
+        
+        # Crear gráfico de barras agrupadas
+        fig_bar = go.Figure()
+        
+        # Barras de Visitas Reales
+        fig_bar.add_trace(go.Bar(
+            x=df_chart['Técnico_Abrev'],
+            y=df_chart['Visitas registradas'],
+            name='Visitas Reales',
+            marker_color='white',
+            offsetgroup=0
+        ))
+        
+        # Barras de Agenda Planificada
+        fig_bar.add_trace(go.Bar(
+            x=df_chart['Técnico_Abrev'],
+            y=df_chart['Agenda semana pasada'],
+            name='Agenda Planificada',
+            marker_color='#a0a0a0',
+            offsetgroup=1
+        ))
+        
+        # Configuración del layout del gráfico
+        fig_bar.update_layout(
+            paper_bgcolor='#1a1a1a', # Fondo del panel
+            plot_bgcolor='#1a1a1a',
+            margin=dict(l=10, r=10, t=30, b=60),
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="right",
+                x=1,
+                font=dict(color='white')
+            ),
+            xaxis=dict(
+                tickfont=dict(color='white', size=10),
+                tickangle=-45,
+                gridcolor='#333'
+            ),
+            yaxis=dict(
+                tickfont=dict(color='white'),
+                gridcolor='#333',
+                zerolinecolor='#333'
+            )
+        )
+        
+        st.plotly_chart(fig_bar, use_container_width=True)
+        
+        st.markdown('</div>', unsafe_allow_html=True) # Cierra contenedor de Barras
+
+# 7. Fila 2: Tickets de Soporte Zoho Desk (Cards + Gráfico de Dona)
+# Banner de título
+st.markdown('<div class="dashboard-panel ticket-banner">', unsafe_allow_html=True)
+st.markdown('<h3>🎫 TICKETS DE SOPORTE ZOHO DESK (Resumen de Backlog)</h3>', unsafe_allow_html=True)
+st.markdown('</div>', unsafe_allow_html=True)
+
+# Columna Izquierda: Panel de Cards de Criticidad (con 3 sub-columnas)
+col_tickets_left, col_tickets_right = st.columns([2, 1])
+
+# Columna Izquierda (Sub-fila de 3 tarjetas)
+with col_tickets_left:
+    st.markdown('<div class="dashboard-panel" style="background-color: transparent; box-shadow: none;">', unsafe_allow_html=True)
+    st.markdown('<h3>⚡ Semáforo de Criticidad</h3>', unsafe_allow_html=True)
+    
+    t_col1, t_col2, t_col3 = st.columns(3)
+    
+    # Iconos unicode para tickets
+    icon_alert = "⚠️"
+    icon_clock = "⌛"
+    icon_chat = "✉️"
+    
+    # CARD 1 (Rojo): VENCIDOS
+    with t_col1:
+        st.markdown(
+            f'<div class="ticket-card red">'
+            f'<div class="ticket-label" style="color: #ff4b4b;">{icon_alert} VENCIDOS</div>'
+            f'<div class="ticket-desc">(Violación de SLA)</div>'
+            f'<div class="ticket-value" style="color: #ff4b4b;">7</div>'
+            f'<div style="font-size: 10px; color: #ff4b4b;">Atención Urgente Requerida</div>'
+            f'</div>',
+            unsafe_allow_html=True
+        )
+        
+    # CARD 2 (Naranja): SIN CIERRE
+    with t_col2:
+        st.markdown(
+            f'<div class="ticket-card orange">'
+            f'<div class="ticket-label" style="color: #ff9f43;">{icon_clock} SIN CIERRE</div>'
+            f'<div class="ticket-desc">(Pendientes de Flujo de Trabajo)</div>'
+            f'<div class="ticket-value" style="color: #ff9f43;">15</div>'
+            f'<div style="font-size: 10px; color: #ff9f43;">Proceso Pendiente</div>'
+            f'</div>',
+            unsafe_allow_html=True
+        )
+        
+    # CARD 3 (Azul): ABIERTOS / NUEVOS
+    with t_col3:
+        st.markdown(
+            f'<div class="ticket-card blue">'
+            f'<div class="ticket-label" style="color: #3b82f6;">{icon_chat} ABIERTOS / NUEVOS</div>'
+            f'<div class="ticket-desc">(Sin Respuesta de Primera Atención)</div>'
+            f'<div class="ticket-value" style="color: #3b82f6;">18</div>'
+            f'<div style="font-size: 10px; color: #3b82f6;">Carga de Trabajo Actual</div>'
+            f'</div>',
+            unsafe_allow_html=True
+        )
+    st.markdown('</div>', unsafe_allow_html=True) # Cierra contenedor de Cards
+
+# Columna Derecha: Gráfico de Dona
+with col_tickets_right:
+    # Contenedor del panel
+    with st.container():
+        st.markdown('<div class="dashboard-panel" style="padding: 10px 20px;">', unsafe_allow_html=True)
+        # Título de sección
+        st.markdown('<h3>📊 DISTRIBUCIÓN DE CRITICIDAD DEL BACKLOG</h3>', unsafe_allow_html=True)
+        
+        # Datos para el gráfico de dona (basados en los números de image_13.png)
+        # Total = 7 + 15 + 18 = 40. Los porcentajes en el gráfico original son 17%, 37%, 46%
+        # Calculamos proporciones para mayor precisión
+        df_pie = pd.DataFrame({
+            'label': ['Vencidos', 'Pendientes Cierre', 'Abiertos/Nuevos'],
+            'value': [7, 15, 18],
+            'color': ['#ff4b4b', '#ff9f43', '#3b82f6'] # Red, Orange, Blue
+        })
+        
+        # Crear gráfico de dona
+        fig_pie = px.pie(
+            df_pie,
+            values='value',
+            names='label',
+            hole=0.5, # Hace que sea un gráfico de dona
+            color_discrete_sequence=df_pie['color'], # Usar colores fijos
+            labels={'label': 'Criticidad', 'value': 'Tickets'}
+        )
+        
+        # Configuración del layout del gráfico
+        fig_pie.update_layout(
+            paper_bgcolor='#1a1a1a', # Fondo del panel
+            plot_bgcolor='#1a1a1a',
+            margin=dict(l=0, r=0, t=10, b=0),
+            showlegend=True,
+            legend=dict(
+                orientation="v",
+                yanchor="middle",
+                y=0.5,
+                xanchor="right",
+                x=1.1,
+                font=dict(color='white')
+            )
+        )
+        fig_pie.update_traces(
+            textposition='inside',
+            textinfo='percent', # Mostrar porcentaje
+            textfont_size=16,
+            marker=dict(line=dict(color='#1a1a1a', width=2))
+        )
+        
+        st.plotly_chart(fig_pie, use_container_width=True)
+        
+        st.markdown('</div>', unsafe_allow_html=True) # Cierra contenedor de Dona
+
+# 8. Footer
+st.markdown('<div class="dashboard-footer">', unsafe_allow_html=True)
+st.markdown(
+    'Nota: Los tickets Vencidos representan una falla crítica en el SLA y deben ser escalados antes que la cola de 18 tickets abiertos (ITIL 4 best practice). <br>'
+    'Generado por Techforce Data Analytics <br>'
+    '1 DE ABRIL, 2026 | Versión: 2026.01.05'
+)
+st.markdown('</div>', unsafe_allow_html=True)
