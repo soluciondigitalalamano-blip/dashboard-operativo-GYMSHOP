@@ -142,7 +142,7 @@ else:
 # ==========================================
 # MÉTRICAS CALCULADAS (sin hardcoding)
 # ==========================================
-total_ventas    = int(df["Cantidad de ventas reportada"].sum())
+total_visitas_real = int(df["Visitas registradas"].sum())
 total_gastos    = float(df["Gastos"].sum())
 total_visitas   = int(df["Visitas registradas"].sum())
 total_agenda    = int(df["Agenda semana pasada"].sum())
@@ -187,14 +187,14 @@ tab1, tab2, tab3, tab4 = st.tabs([
 # TAB 1: KPIs
 # ------------------------------------------
 with tab1:
-    k1, k2, k3, k4 = st.columns(4)
+    k1, k2, k3 = st.columns(3)
 
     with k1:
         st.markdown(f"""
         <div class="kpi-card">
-            <div class="kpi-title">Total Ventas Reportadas</div>
-            <div class="kpi-value">{total_ventas}</div>
-            <div class="kpi-sub">Acumulado del período</div>
+            <div class="kpi-title">Total Visitas Realizadas</div>
+            <div class="kpi-value">{total_visitas_real}</div>
+            <div class="kpi-sub">Suma columna Real del período</div>
         </div>""", unsafe_allow_html=True)
 
     with k2:
@@ -212,14 +212,6 @@ with tab1:
             <div class="kpi-title">% Cumplimiento Global</div>
             <div class="kpi-value" style="color:{color_cum};">{cumplimiento:.1f}%</div>
             <div class="kpi-sub">Visitas reales vs planificadas</div>
-        </div>""", unsafe_allow_html=True)
-
-    with k4:
-        st.markdown(f"""
-        <div class="kpi-card">
-            <div class="kpi-title">Volumen Operativo</div>
-            <div class="kpi-value">{total_visitas} <span style='font-size:1rem; color:#8B949E;'>de {total_agenda}</span></div>
-            <div class="kpi-sub">Ejecución vs Plan</div>
         </div>""", unsafe_allow_html=True)
 
     # Alertas calculadas — no hardcodeadas
