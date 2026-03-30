@@ -5,7 +5,7 @@ import plotly.express as px
 from datetime import date
 from pathlib import Path
 import os
- 
+
 # ==========================================
 # CONFIGURACIÓN
 # ==========================================
@@ -15,12 +15,12 @@ st.set_page_config(
     page_icon="📊",
     initial_sidebar_state="expanded"
 )
- 
+
 custom_css = """
 <style>
     .stApp { background-color: #0E1117; }
     h1, h2, h3 { color: #FFFFFF !important; font-family: 'Segoe UI', sans-serif; font-weight: 600; }
- 
+
     .kpi-card {
         background: linear-gradient(145deg, #1A1C23 0%, #121418 100%);
         border: 1px solid #2D303E;
@@ -33,17 +33,17 @@ custom_css = """
     .kpi-title { color: #8B949E; font-size: 0.9rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
     .kpi-value { color: #FFFFFF; font-size: 2.2rem; font-weight: 700; margin-bottom: 5px; }
     .kpi-sub   { color: #8B949E; font-size: 0.85rem; }
- 
+
     .ticket-card { border-radius: 12px; padding: 20px; text-align: center; font-weight: bold; }
     .ticket-card.danger  { background-color: rgba(248,81,73,0.1);  border: 1px solid #F85149; }
     .ticket-card.warning { background-color: rgba(210,153,34,0.1); border: 1px solid #D29922; }
     .ticket-card.info    { background-color: rgba(88,166,255,0.1); border: 1px solid #58A6FF; }
     .t-val { font-size: 3.5rem; line-height: 1; margin: 10px 0; }
- 
+
     .stTabs [data-baseweb="tab-list"] { gap: 24px; }
     .stTabs [data-baseweb="tab"] { height: 50px; background-color: transparent; border-radius: 4px 4px 0 0; padding: 10px; }
     .stTabs [aria-selected="true"] { color: #4facfe !important; border-bottom: 2px solid #4facfe !important; }
- 
+
     .alert-warning {
         background-color: rgba(210,153,34,0.1);
         border: 1px solid #D29922;
@@ -56,8 +56,8 @@ custom_css = """
 </style>
 """
 st.markdown(custom_css, unsafe_allow_html=True)
- 
- 
+
+
 # ==========================================
 # CARGA DE DATOS — DESDE ARCHIVOS CSV
 # ==========================================
@@ -74,13 +74,13 @@ DATA_DIR = next(
     (p for p in _CANDIDATES if (p / "operaciones.csv").exists()),
     Path(os.getcwd())
 )
- 
+
 @st.cache_data(ttl=300)  # Refresca cada 5 minutos si el archivo cambia
 def load_data():
     df_ops = pd.read_csv(DATA_DIR / "operaciones.csv")
     df_cal = pd.read_csv(DATA_DIR / "calendario.csv", parse_dates=["Fecha"])
     df_tickets = pd.read_csv(DATA_DIR / "tickets.csv")
- 
+
     # Calcular % de visitas vs agenda (evitar división por cero)
     df_ops["% Cumplimiento"] = df_ops.apply(
         lambda r: (r["Visitas registradas"] / r["Agenda semana pasada"] * 100)
@@ -88,14 +88,14 @@ def load_data():
         axis=1
     )
     return df_ops, df_cal, df_tickets
- 
+
 df_master, df_cal_master, df_tickets = load_data()
- 
+
 # Fecha de corte dinámica: último lunes de los datos del calendario
 fecha_corte = df_cal_master["Fecha"].max()
 fecha_corte_str = fecha_corte.strftime("%-d de %B, %Y") if hasattr(fecha_corte, 'strftime') else str(fecha_corte)
- 
- 
+
+
 # ==========================================
 # SIDEBAR Y FILTROS
 # ==========================================
@@ -104,17 +104,17 @@ with st.sidebar:
     st.caption("Panel de Control Gerencial")
     st.markdown("---")
     st.markdown("**Filtros Operativos**")
- 
+
     lista_tecnicos = ["Ver Todos (Visión Global)"] + sorted(df_master["Técnico"].unique().tolist())
     tec_seleccionado = st.selectbox("👨‍🔧 Seleccionar Técnico:", lista_tecnicos)
- 
+
     st.markdown("---")
     if st.button("🔄 Recargar datos"):
         st.cache_data.clear()
         st.rerun()
- 
+
     st.caption("Desarrollado por Techforce")
- 
+
 # Aplicar filtro
 if tec_seleccionado == "Ver Todos (Visión Global)":
     df = df_master.copy()
@@ -124,8 +124,8 @@ else:
     df = df_master[df_master["Técnico"] == tec_seleccionado].copy()
     df_cal = df_cal_master[df_cal_master["Técnico"] == tec_seleccionado].copy()
     vista_actual = f"Rendimiento de: {tec_seleccionado}"
- 
- 
+
+
 # ==========================================
 # MÉTRICAS CALCULADAS (sin hardcoding)
 # ==========================================
@@ -134,14 +134,14 @@ total_gastos    = float(df["Gastos"].sum())
 total_visitas   = int(df["Visitas registradas"].sum())
 total_agenda    = int(df["Agenda semana pasada"].sum())
 cumplimiento    = (total_visitas / total_agenda * 100) if total_agenda > 0 else 0
- 
+
 # Técnicos con cumplimiento > 100% (para alerta)
 tecnicos_sobre100 = df[df["% Cumplimiento"] > 100]["Técnico"].tolist()
- 
+
 # Técnicos sin agenda asignada
 tecnicos_sin_agenda = df[df["Agenda semana pasada"] == 0]["Técnico"].tolist()
- 
- 
+
+
 # ==========================================
 # CABECERA
 # ==========================================
@@ -155,10 +155,10 @@ with col_h2:
         f"Corte: <b>{fecha_corte_str}</b></div>",
         unsafe_allow_html=True
     )
- 
+
 st.markdown("<br>", unsafe_allow_html=True)
- 
- 
+
+
 # ==========================================
 # TABS
 # ==========================================
@@ -167,14 +167,14 @@ tab1, tab2, tab3 = st.tabs([
     "🎫 2. SOPORTE Y TICKETS (DESK)",
     "📅 3. AGENDA Y CALENDARIO"
 ])
- 
- 
+
+
 # ------------------------------------------
 # TAB 1: KPIs
 # ------------------------------------------
 with tab1:
     k1, k2, k3, k4 = st.columns(4)
- 
+
     with k1:
         st.markdown(f"""
         <div class="kpi-card">
@@ -182,7 +182,7 @@ with tab1:
             <div class="kpi-value">{total_ventas}</div>
             <div class="kpi-sub">Acumulado del período</div>
         </div>""", unsafe_allow_html=True)
- 
+
     with k2:
         st.markdown(f"""
         <div class="kpi-card">
@@ -190,7 +190,7 @@ with tab1:
             <div class="kpi-value">${total_gastos:,.0f}</div>
             <div class="kpi-sub">Gastos reportados del período</div>
         </div>""", unsafe_allow_html=True)
- 
+
     with k3:
         color_cum = "#2EA043" if cumplimiento >= 80 else ("#D29922" if cumplimiento >= 50 else "#F85149")
         st.markdown(f"""
@@ -199,7 +199,7 @@ with tab1:
             <div class="kpi-value" style="color:{color_cum};">{cumplimiento:.1f}%</div>
             <div class="kpi-sub">Visitas reales vs planificadas</div>
         </div>""", unsafe_allow_html=True)
- 
+
     with k4:
         st.markdown(f"""
         <div class="kpi-card">
@@ -207,7 +207,7 @@ with tab1:
             <div class="kpi-value">{total_visitas} <span style='font-size:1rem; color:#8B949E;'>de {total_agenda}</span></div>
             <div class="kpi-sub">Ejecución vs Plan</div>
         </div>""", unsafe_allow_html=True)
- 
+
     # Alertas calculadas — no hardcodeadas
     if tecnicos_sobre100:
         nombres = ", ".join([n.split()[0] for n in tecnicos_sobre100])
@@ -216,7 +216,7 @@ with tab1:
             f'Verificar si hay visitas no agendadas o error de registro.</div>',
             unsafe_allow_html=True
         )
- 
+
     if tecnicos_sin_agenda:
         nombres_sa = ", ".join([n.split()[0] for n in tecnicos_sin_agenda])
         st.markdown(
@@ -224,95 +224,56 @@ with tab1:
             f'ℹ️ Sin agenda asignada: <b>{nombres_sa}</b> — No se calcula cumplimiento para estos técnicos.</div>',
             unsafe_allow_html=True
         )
- 
+
     st.markdown("<br>", unsafe_allow_html=True)
- 
-    col_chart, col_table = st.columns([2, 3])
- 
-    with col_chart:
-        st.markdown("#### 📈 Comparativa: Real vs Planificado")
- 
-        # Abreviatura segura (no lanza IndexError)
-        def abreviar(nombre):
-            partes = nombre.split()
-            if len(partes) >= 2:
-                return partes[0] + " " + partes[1][0] + "."
-            return partes[0]
- 
-        df_chart = df.copy()
-        df_chart["Tec_Abrev"] = df_chart["Técnico"].apply(abreviar)
- 
-        fig = go.Figure()
-        fig.add_trace(go.Bar(
-            x=df_chart["Tec_Abrev"],
-            y=df_chart["Visitas registradas"],
-            name="Realizado",
-            marker_color="#4facfe"
-        ))
-        fig.add_trace(go.Bar(
-            x=df_chart["Tec_Abrev"],
-            y=df_chart["Agenda semana pasada"],
-            name="Planificado",
-            marker_color="#2D303E"
-        ))
-        fig.update_layout(
-            template="plotly_dark",
-            plot_bgcolor="rgba(0,0,0,0)",
-            paper_bgcolor="rgba(0,0,0,0)",
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            margin=dict(t=10, l=0, r=0, b=0)
-        )
-        st.plotly_chart(fig, use_container_width=True)
- 
-    with col_table:
-        st.markdown("#### 📋 Detalle Operativo")
- 
-        # Preparar tabla con tratamiento de N/A para técnicos sin agenda
-        df_display = df[[
-            "Técnico", "Visitas registradas", "Agenda semana pasada",
-            "% Cumplimiento", "Gastos", "Cantidad de ventas reportada",
-            "Servicios agendados esta semana"
-        ]].copy()
- 
-        st.dataframe(
-            df_display,
-            column_config={
-                "Técnico": st.column_config.TextColumn("Técnico Asignado", width="medium"),
-                "Visitas registradas": st.column_config.NumberColumn("Real", format="%d"),
-                "Agenda semana pasada": st.column_config.NumberColumn("Plan", format="%d"),
-                "% Cumplimiento": st.column_config.ProgressColumn(
-                    "Cumplimiento",
-                    help="N/A = sin agenda asignada. >100% = visitas superaron el plan.",
-                    format="%.1f%%",
-                    min_value=0,
-                    max_value=100,
-                ),
-                "Gastos": st.column_config.NumberColumn("Gastos (COP)", format="$ %d"),
-                "Cantidad de ventas reportada": st.column_config.NumberColumn("Ventas", format="%d"),
-                "Servicios agendados esta semana": st.column_config.NumberColumn("Agenda próx. semana", format="%d"),
-            },
-            hide_index=True,
-            use_container_width=True,
-            height=380
-        )
- 
- 
+
+    st.markdown("#### 📋 Detalle Operativo")
+
+    df_display = df[[
+        "Técnico", "Visitas registradas", "Agenda semana pasada",
+        "% Cumplimiento", "Gastos", "Cantidad de ventas reportada",
+        "Servicios agendados esta semana"
+    ]].copy()
+
+    st.dataframe(
+        df_display,
+        column_config={
+            "Técnico": st.column_config.TextColumn("Técnico Asignado", width="medium"),
+            "Visitas registradas": st.column_config.NumberColumn("Real", format="%d"),
+            "Agenda semana pasada": st.column_config.NumberColumn("Plan", format="%d"),
+            "% Cumplimiento": st.column_config.ProgressColumn(
+                "Cumplimiento",
+                help="N/A = sin agenda asignada. >100% = visitas superaron el plan.",
+                format="%.1f%%",
+                min_value=0,
+                max_value=100,
+            ),
+            "Gastos": st.column_config.NumberColumn("Gastos (COP)", format="$ %d"),
+            "Cantidad de ventas reportada": st.column_config.NumberColumn("Ventas", format="%d"),
+            "Servicios agendados esta semana": st.column_config.NumberColumn("Agenda próx. semana", format="%d"),
+        },
+        hide_index=True,
+        use_container_width=True,
+        height=420
+    )
+
+
 # ------------------------------------------
 # TAB 2: TICKETS (desde CSV)
 # ------------------------------------------
 with tab2:
     st.markdown("### Estado Actual del Backlog (Zoho Desk)")
     st.caption("Datos globales de la cola de servicio. Actualizar en `data/tickets.csv`.")
- 
+
     # Mapeo de estilos por estado
     estilos = {
         "VENCIDOS (SLA)":   ("danger",  "⚠️", "#F85149", "Atención Crítica"),
         "SIN CIERRE":       ("warning", "⌛", "#D29922", "Pendientes de Flujo"),
         "NUEVOS/ABIERTOS":  ("info",    "✉️", "#58A6FF", "Carga Operativa"),
     }
- 
+
     cols_tickets = st.columns([1, 1, 1, 1.5])
- 
+
     for i, (_, row) in enumerate(df_tickets.iterrows()):
         estado = row["Estado"]
         cantidad = int(row["Cantidad"])
@@ -326,7 +287,7 @@ with tab2:
                     f'{label}</div>',
                     unsafe_allow_html=True
                 )
- 
+
     with cols_tickets[3]:
         fig_pie = px.pie(
             df_tickets,
@@ -348,8 +309,8 @@ with tab2:
             height=200
         )
         st.plotly_chart(fig_pie, use_container_width=True)
- 
- 
+
+
 # ------------------------------------------
 # TAB 3: CALENDARIO (desde CSV)
 # ------------------------------------------
@@ -361,13 +322,13 @@ with tab3:
         )
     else:
         c1, c2 = st.columns([1, 2])
- 
+
         with c1:
             st.markdown("#### Distribución de la Semana")
- 
+
             df_cal["Fecha_str"] = df_cal["Fecha"].dt.strftime("%d/%m")
             cal_summary = df_cal.groupby(["Fecha_str", "Estado"]).size().reset_index(name="Total")
- 
+
             color_map = {
                 "CONFIRMADO CON CLIENTE":    "#2EA043",
                 "POR CONFIRMAR CON CLIENTE": "#D29922",
@@ -389,20 +350,20 @@ with tab3:
                 margin=dict(t=20)
             )
             st.plotly_chart(fig_cal, use_container_width=True)
- 
+
         with c2:
             st.markdown("#### Matriz de Programación")
- 
+
             state_icons = {
                 "CONFIRMADO CON CLIENTE":    "🟢 Conf.",
                 "POR CONFIRMAR CON CLIENTE": "🟠 Por Conf.",
                 "PENDIENTE PROGRAMAR":       "🔵 Pend."
             }
- 
+
             df_cal_view = df_cal.copy()
             df_cal_view["Icono"] = df_cal_view["Estado"].map(state_icons)
             df_cal_view["Fecha_str"] = df_cal_view["Fecha"].dt.strftime("%d/%m")
- 
+
             summary_mat = (
                 df_cal_view
                 .groupby(["Técnico", "Fecha_str", "Icono"])
@@ -410,14 +371,14 @@ with tab3:
                 .reset_index(name="count")
             )
             summary_mat["Tag"] = summary_mat["count"].astype(str) + " " + summary_mat["Icono"]
- 
+
             table_data = (
                 summary_mat
                 .groupby(["Técnico", "Fecha_str"])["Tag"]
                 .apply(lambda x: " | ".join(x))
                 .reset_index()
             )
- 
+
             try:
                 pivot_table = (
                     table_data
