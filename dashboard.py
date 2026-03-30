@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 from datetime import date
 from pathlib import Path
+import os
  
 # ==========================================
 # CONFIGURACIÓN
@@ -60,7 +61,15 @@ st.markdown(custom_css, unsafe_allow_html=True)
 # ==========================================
 # CARGA DE DATOS — DESDE ARCHIVOS CSV
 # ==========================================
-DATA_DIR = Path(__file__).parent / "data"
+# Resolución de ruta compatible con local y Streamlit Cloud
+# En Streamlit Cloud el app corre desde el root del repo, no desde la carpeta del archivo
+_THIS_FILE = Path(__file__).resolve()
+_CANDIDATES = [
+    _THIS_FILE.parent / "data",          # local: app.py está junto a /data
+    Path(os.getcwd()) / "data",          # Streamlit Cloud: CWD es el root del repo
+    Path(os.getcwd()) / "gym_dashboard" / "data",  # si el repo tiene subcarpeta
+]
+DATA_DIR = next((p for p in _CANDIDATES if p.exists()), _THIS_FILE.parent / "data")
  
 @st.cache_data(ttl=300)  # Refresca cada 5 minutos si el archivo cambia
 def load_data():
