@@ -81,15 +81,28 @@ def load_data():
     df_cal = pd.read_csv(DATA_DIR / "calendario.csv", parse_dates=["Fecha"])
     df_tickets = pd.read_csv(DATA_DIR / "tickets.csv")
 
+    # Ventas semanales
+    df_ventas = pd.read_csv(DATA_DIR / "ventas.csv")
+    df_ventas.columns = df_ventas.columns.str.strip()
+    df_ventas["Fecha"] = pd.to_datetime(df_ventas["Fecha"])
+    df_ventas["Venta_num"] = (
+        df_ventas["Venta día"]
+        .str.replace("COP", "", regex=False)
+        .str.replace(".", "", regex=False)
+        .str.replace(",", ".", regex=False)
+        .str.strip()
+        .astype(float)
+    )
+
     # Calcular % de visitas vs agenda (evitar división por cero)
     df_ops["% Cumplimiento"] = df_ops.apply(
         lambda r: (r["Visitas registradas"] / r["Agenda semana pasada"] * 100)
         if r["Agenda semana pasada"] > 0 else None,
         axis=1
     )
-    return df_ops, df_cal, df_tickets
+    return df_ops, df_cal, df_tickets, df_ventas
 
-df_master, df_cal_master, df_tickets = load_data()
+df_master, df_cal_master, df_tickets, df_ventas = load_data()
 
 # Fecha de corte dinámica: último lunes de los datos del calendario
 fecha_corte = df_cal_master["Fecha"].max()
@@ -162,10 +175,11 @@ st.markdown("<br>", unsafe_allow_html=True)
 # ==========================================
 # TABS
 # ==========================================
-tab1, tab2, tab3 = st.tabs([
+tab1, tab2, tab3, tab4 = st.tabs([
     "📊 1. VISIÓN GENERAL Y KPIs",
     "🎫 2. SOPORTE Y TICKETS (DESK)",
-    "📅 3. AGENDA Y CALENDARIO"
+    "📅 3. AGENDA Y CALENDARIO",
+    "💰 4. VENTA SEMANAL"
 ])
 
 
@@ -389,3 +403,132 @@ with tab3:
                 st.dataframe(pivot_table, hide_index=True, use_container_width=True, height=320)
             except Exception as e:
                 st.error(f"No se pudo construir la matriz de programación: {e}")
+
+
+# ------------------------------------------
+# TAB 4: VENTA SEMANAL
+# ------------------------------------------
+with tab4:
+    # Filtrar ventas solo positivas (excluir notas crédito)
+    df_v = df_ventas[df_ventas["Venta_num"] > 0].copy()
+
+    total_venta      = df_v["Venta_num"].sum()
+    num_facturas     = len(df_v)
+    ticket_promedio  = df_v["Venta_num"].mean()
+    num_clientes     = df_v["Cliente"].nunique()
+    ciudad_top       = df_v.groupby("Ciudad")["Venta_num"].sum().idxmax()
+    segmento_top     = df_v.groupby("Segmento")["Venta_num"].sum().idxmax()
+
+    # KPIs
+    v1, v2, v3, v4 = st.columns(4)
+    with v1:
+        st.markdown(f"""
+        <div class="kpi-card">
+            <div class="kpi-title">Total Facturado</div>
+            <div class="kpi-value" style="font-size:1.7rem;">${total_venta:,.0f}</div>
+            <div class="kpi-sub">COP — semana en curso</div>
+        </div>""", unsafe_allow_html=True)
+    with v2:
+        st.markdown(f"""
+        <div class="kpi-card">
+            <div class="kpi-title">Facturas Emitidas</div>
+            <div class="kpi-value">{num_facturas}</div>
+            <div class="kpi-sub">{num_clientes} clientes únicos</div>
+        </div>""", unsafe_allow_html=True)
+    with v3:
+        st.markdown(f"""
+        <div class="kpi-card">
+            <div class="kpi-title">Ticket Promedio</div>
+            <div class="kpi-value" style="font-size:1.7rem;">${ticket_promedio:,.0f}</div>
+            <div class="kpi-sub">COP por factura</div>
+        </div>""", unsafe_allow_html=True)
+    with v4:
+        st.markdown(f"""
+        <div class="kpi-card">
+            <div class="kpi-title">Top Segmento</div>
+            <div class="kpi-value" style="font-size:1.4rem;">{segmento_top}</div>
+            <div class="kpi-sub">Mayor volumen · {ciudad_top}</div>
+        </div>""", unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    col_dia, col_seg = st.columns(2)
+
+    with col_dia:
+        st.markdown("#### 📅 Venta por Día")
+        ventas_dia = (
+            df_v.groupby(df_v["Fecha"].dt.strftime("%d/%m"))["Venta_num"]
+            .sum()
+            .reset_index()
+            .rename(columns={"Fecha": "Día", "Venta_num": "Total"})
+        )
+        fig_dia = go.Figure(go.Bar(
+            x=ventas_dia["Día"],
+            y=ventas_dia["Total"],
+            marker_color="#4facfe",
+            text=[f"${v:,.0f}" for v in ventas_dia["Total"]],
+            textposition="outside",
+            textfont=dict(color="#8B949E", size=11)
+        ))
+        fig_dia.update_layout(
+            template="plotly_dark",
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+            margin=dict(t=30, l=0, r=0, b=0),
+            yaxis=dict(showgrid=False, showticklabels=False),
+        )
+        st.plotly_chart(fig_dia, use_container_width=True)
+
+    with col_seg:
+        st.markdown("#### 🏷️ Venta por Segmento")
+        ventas_seg = (
+            df_v.groupby("Segmento")["Venta_num"]
+            .sum()
+            .reset_index()
+            .sort_values("Venta_num", ascending=True)
+        )
+        colores_seg = ["#4facfe", "#2EA043", "#D29922", "#F85149", "#a78bfa", "#34d399"]
+        fig_seg = go.Figure(go.Bar(
+            y=ventas_seg["Segmento"],
+            x=ventas_seg["Venta_num"],
+            orientation="h",
+            marker_color=colores_seg[:len(ventas_seg)],
+            text=[f"${v:,.0f}" for v in ventas_seg["Venta_num"]],
+            textposition="outside",
+            textfont=dict(color="#8B949E", size=11)
+        ))
+        fig_seg.update_layout(
+            template="plotly_dark",
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+            margin=dict(t=30, l=0, r=0, b=0),
+            xaxis=dict(showgrid=False, showticklabels=False),
+        )
+        st.plotly_chart(fig_seg, use_container_width=True)
+
+    st.markdown("#### 📋 Detalle de Facturas")
+    df_v_display = df_v[[
+        "Factura periodo", "Fecha", "Cliente", "Segmento", "Ciudad", "Venta_num"
+    ]].copy()
+    df_v_display = df_v_display.sort_values("Fecha", ascending=False)
+
+    st.dataframe(
+        df_v_display,
+        column_config={
+            "Factura periodo": st.column_config.TextColumn("Factura", width="small"),
+            "Fecha": st.column_config.DateColumn("Fecha", format="DD/MM/YYYY"),
+            "Cliente": st.column_config.TextColumn("Cliente", width="large"),
+            "Segmento": st.column_config.TextColumn("Segmento"),
+            "Ciudad": st.column_config.TextColumn("Ciudad"),
+            "Venta_num": st.column_config.NumberColumn("Valor (COP)", format="$ %,.0f"),
+        },
+        hide_index=True,
+        use_container_width=True,
+        height=(len(df_v_display) * 35 + 38)
+    )
+
+    # Nota sobre notas crédito excluidas
+    nc = df_ventas[df_ventas["Venta_num"] < 0]
+    if not nc.empty:
+        total_nc = nc["Venta_num"].sum()
+        st.caption(f"ℹ️ Se excluyeron {len(nc)} nota(s) crédito por un total de ${total_nc:,.0f} COP. No afectan el total facturado.")
