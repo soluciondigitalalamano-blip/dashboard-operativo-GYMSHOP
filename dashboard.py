@@ -78,7 +78,18 @@ DATA_DIR = next(
 @st.cache_data(ttl=300)  # Refresca cada 5 minutos si el archivo cambia
 def load_data():
     df_ops = pd.read_csv(DATA_DIR / "operaciones.csv")
-    df_cal = pd.read_csv(DATA_DIR / "calendario.csv", parse_dates=["Fecha"])
+    df_cal = pd.read_csv(DATA_DIR / "calendario.csv")
+    df_cal.columns = df_cal.columns.str.strip()
+    _meses = {
+        "enero":"01","febrero":"02","marzo":"03","abril":"04","mayo":"05","junio":"06",
+        "julio":"07","agosto":"08","septiembre":"09","octubre":"10","noviembre":"11","diciembre":"12"
+    }
+    def _parse_fecha(s):
+        s = str(s).lower().strip()
+        for m, n in _meses.items():
+            s = s.replace(f" de {m} de ", f"/{n}/")
+        return pd.to_datetime(s, format="%d/%m/%Y", errors="coerce")
+    df_cal["Fecha"] = df_cal["Fecha"].apply(_parse_fecha)
     df_tickets = pd.read_csv(DATA_DIR / "tickets.csv")
 
     # Ventas semanales
@@ -318,7 +329,7 @@ with tab2:
 
 
 # ------------------------------------------
-# TAB 3: CALENDARIO (desde CSV)
+# TAB 3: AGENDA Y CALENDARIO (desde CSV)
 # ------------------------------------------
 with tab3:
     if df_cal.empty:
@@ -327,74 +338,46 @@ with tab3:
             "Verifica el archivo `data/calendario.csv`."
         )
     else:
-        c1, c2 = st.columns([1, 2])
+        st.markdown("#### Matriz de Programación")
 
-        with c1:
-            st.markdown("#### Distribución de la Semana")
+        state_icons = {
+            "CONFIRMADO CON CLIENTE":    "🟢 Conf.",
+            "POR CONFIRMAR CON CLIENTE": "🟠 Por Conf.",
+            "PENDIENTE PROGRAMAR":       "🔵 Pend.",
+            "REPROGRAMADO":              "🔴 Reprog.",
+            "EJECUTADO":                 "✅ Ejec.",
+        }
 
-            df_cal["Fecha_str"] = df_cal["Fecha"].dt.strftime("%d/%m")
-            cal_summary = df_cal.groupby(["Fecha_str", "Estado"]).size().reset_index(name="Total")
+        df_cal_view = df_cal.copy()
+        df_cal_view["Icono"] = df_cal_view["Estado"].map(state_icons).fillna(df_cal_view["Estado"])
+        df_cal_view["Fecha_str"] = df_cal_view["Fecha"].dt.strftime("%d/%m")
 
-            color_map = {
-                "CONFIRMADO CON CLIENTE":    "#2EA043",
-                "POR CONFIRMAR CON CLIENTE": "#D29922",
-                "PENDIENTE PROGRAMAR":       "#58A6FF"
-            }
-            fig_cal = px.bar(
-                cal_summary,
-                x="Fecha_str",
-                y="Total",
-                color="Estado",
-                color_discrete_map=color_map,
-                text="Total"
-            )
-            fig_cal.update_layout(
-                template="plotly_dark",
-                plot_bgcolor="rgba(0,0,0,0)",
-                paper_bgcolor="rgba(0,0,0,0)",
-                legend=dict(orientation="h", yanchor="bottom", y=-0.45, xanchor="center", x=0.5),
-                margin=dict(t=20)
-            )
-            st.plotly_chart(fig_cal, use_container_width=True)
+        summary_mat = (
+            df_cal_view
+            .groupby(["Técnico", "Fecha_str", "Icono"])
+            .size()
+            .reset_index(name="count")
+        )
+        summary_mat["Tag"] = summary_mat["count"].astype(str) + " " + summary_mat["Icono"]
 
-        with c2:
-            st.markdown("#### Matriz de Programación")
+        table_data = (
+            summary_mat
+            .groupby(["Técnico", "Fecha_str"])["Tag"]
+            .apply(lambda x: " | ".join(x))
+            .reset_index()
+        )
 
-            state_icons = {
-                "CONFIRMADO CON CLIENTE":    "🟢 Conf.",
-                "POR CONFIRMAR CON CLIENTE": "🟠 Por Conf.",
-                "PENDIENTE PROGRAMAR":       "🔵 Pend."
-            }
-
-            df_cal_view = df_cal.copy()
-            df_cal_view["Icono"] = df_cal_view["Estado"].map(state_icons)
-            df_cal_view["Fecha_str"] = df_cal_view["Fecha"].dt.strftime("%d/%m")
-
-            summary_mat = (
-                df_cal_view
-                .groupby(["Técnico", "Fecha_str", "Icono"])
-                .size()
-                .reset_index(name="count")
-            )
-            summary_mat["Tag"] = summary_mat["count"].astype(str) + " " + summary_mat["Icono"]
-
-            table_data = (
-                summary_mat
-                .groupby(["Técnico", "Fecha_str"])["Tag"]
-                .apply(lambda x: " | ".join(x))
+        try:
+            pivot_table = (
+                table_data
+                .pivot_table(index="Técnico", columns="Fecha_str", values="Tag", aggfunc="first")
+                .fillna("-")
                 .reset_index()
             )
-
-            try:
-                pivot_table = (
-                    table_data
-                    .pivot_table(index="Técnico", columns="Fecha_str", values="Tag", aggfunc="first")
-                    .fillna("-")
-                    .reset_index()
-                )
-                st.dataframe(pivot_table, hide_index=True, use_container_width=True, height=320)
-            except Exception as e:
-                st.error(f"No se pudo construir la matriz de programación: {e}")
+            n_rows = len(pivot_table)
+            st.dataframe(pivot_table, hide_index=True, use_container_width=True, height=(n_rows * 35 + 38))
+        except Exception as e:
+            st.error(f"No se pudo construir la matriz de programación: {e}")
 
 
 # ------------------------------------------
