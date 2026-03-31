@@ -412,7 +412,7 @@ with tab4:
     segmento_top     = df_v.groupby("Segmento")["Venta_num"].sum().idxmax()
 
     # KPIs
-    v1, v2, v3, v4 = st.columns(4)
+    v1, v2, v3 = st.columns(3)
     with v1:
         st.markdown(f"""
         <div class="kpi-card">
@@ -423,18 +423,11 @@ with tab4:
     with v2:
         st.markdown(f"""
         <div class="kpi-card">
-            <div class="kpi-title">Facturas Emitidas</div>
-            <div class="kpi-value">{num_facturas}</div>
-            <div class="kpi-sub">{num_clientes} clientes únicos</div>
-        </div>""", unsafe_allow_html=True)
-    with v3:
-        st.markdown(f"""
-        <div class="kpi-card">
             <div class="kpi-title">Ticket Promedio</div>
             <div class="kpi-value" style="font-size:1.7rem;">${ticket_promedio:,.0f}</div>
             <div class="kpi-sub">COP por factura</div>
         </div>""", unsafe_allow_html=True)
-    with v4:
+    with v3:
         st.markdown(f"""
         <div class="kpi-card">
             <div class="kpi-title">Top Segmento</div>
@@ -443,60 +436,6 @@ with tab4:
         </div>""", unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
-
-    col_dia, col_seg = st.columns(2)
-
-    with col_dia:
-        st.markdown("#### 📅 Venta por Día")
-        ventas_dia = (
-            df_v.groupby(df_v["Fecha"].dt.strftime("%d/%m"))["Venta_num"]
-            .sum()
-            .reset_index()
-            .rename(columns={"Fecha": "Día", "Venta_num": "Total"})
-        )
-        fig_dia = go.Figure(go.Bar(
-            x=ventas_dia["Día"],
-            y=ventas_dia["Total"],
-            marker_color="#4facfe",
-            text=[f"${v:,.0f}" for v in ventas_dia["Total"]],
-            textposition="outside",
-            textfont=dict(color="#8B949E", size=11)
-        ))
-        fig_dia.update_layout(
-            template="plotly_dark",
-            plot_bgcolor="rgba(0,0,0,0)",
-            paper_bgcolor="rgba(0,0,0,0)",
-            margin=dict(t=30, l=0, r=0, b=0),
-            yaxis=dict(showgrid=False, showticklabels=False),
-        )
-        st.plotly_chart(fig_dia, use_container_width=True)
-
-    with col_seg:
-        st.markdown("#### 🏷️ Venta por Segmento")
-        ventas_seg = (
-            df_v.groupby("Segmento")["Venta_num"]
-            .sum()
-            .reset_index()
-            .sort_values("Venta_num", ascending=True)
-        )
-        colores_seg = ["#4facfe", "#2EA043", "#D29922", "#F85149", "#a78bfa", "#34d399"]
-        fig_seg = go.Figure(go.Bar(
-            y=ventas_seg["Segmento"],
-            x=ventas_seg["Venta_num"],
-            orientation="h",
-            marker_color=colores_seg[:len(ventas_seg)],
-            text=[f"${v:,.0f}" for v in ventas_seg["Venta_num"]],
-            textposition="outside",
-            textfont=dict(color="#8B949E", size=11)
-        ))
-        fig_seg.update_layout(
-            template="plotly_dark",
-            plot_bgcolor="rgba(0,0,0,0)",
-            paper_bgcolor="rgba(0,0,0,0)",
-            margin=dict(t=30, l=0, r=0, b=0),
-            xaxis=dict(showgrid=False, showticklabels=False),
-        )
-        st.plotly_chart(fig_seg, use_container_width=True)
 
     st.markdown("#### 📋 Detalle de Facturas")
     df_v_display = df_v[[
