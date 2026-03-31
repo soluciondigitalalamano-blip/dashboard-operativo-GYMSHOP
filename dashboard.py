@@ -338,6 +338,41 @@ with tab3:
             "Verifica el archivo `data/calendario.csv`."
         )
     else:
+        # Métricas calculadas
+        servicios_por_tec = df_cal.groupby("Técnico").size()
+        tec_mas   = servicios_por_tec.idxmax()
+        tec_menos = servicios_por_tec.idxmin()
+        tec_mas_count   = int(servicios_por_tec.max())
+        tec_menos_count = int(servicios_por_tec.min())
+        pct_confirmados = (
+            (df_cal["Estado"] == "CONFIRMADO CON CLIENTE").sum() / len(df_cal) * 100
+        )
+
+        m1, m2, m3 = st.columns(3)
+        with m1:
+            st.markdown(f"""
+            <div class="kpi-card">
+                <div class="kpi-title">Técnico con más servicios</div>
+                <div class="kpi-value" style="font-size:1.3rem;">{tec_mas.split()[0]} {tec_mas.split()[1]}</div>
+                <div class="kpi-sub">{tec_mas_count} servicios agendados</div>
+            </div>""", unsafe_allow_html=True)
+        with m2:
+            st.markdown(f"""
+            <div class="kpi-card">
+                <div class="kpi-title">Técnico con menos servicios</div>
+                <div class="kpi-value" style="font-size:1.3rem;">{tec_menos.split()[0]} {tec_menos.split()[1]}</div>
+                <div class="kpi-sub">{tec_menos_count} servicio(s) agendado(s)</div>
+            </div>""", unsafe_allow_html=True)
+        with m3:
+            color_pct = "#2EA043" if pct_confirmados >= 80 else ("#D29922" if pct_confirmados >= 50 else "#F85149")
+            st.markdown(f"""
+            <div class="kpi-card">
+                <div class="kpi-title">% Servicios Confirmados</div>
+                <div class="kpi-value" style="color:{color_pct};">{pct_confirmados:.1f}%</div>
+                <div class="kpi-sub">Del total de la agenda semanal</div>
+            </div>""", unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("#### Matriz de Programación")
 
         state_icons = {
@@ -352,17 +387,12 @@ with tab3:
         df_cal_view["Icono"] = df_cal_view["Estado"].map(state_icons).fillna(df_cal_view["Estado"])
         df_cal_view["Fecha_str"] = df_cal_view["Fecha"].dt.strftime("%d/%m")
 
-        summary_mat = (
-            df_cal_view
-            .groupby(["Técnico", "Fecha_str", "Icono"])
-            .size()
-            .reset_index(name="count")
-        )
-        summary_mat["Tag"] = summary_mat["count"].astype(str) + " " + summary_mat["Icono"]
+        # Incluir cliente en el tag
+        df_cal_view["Tag_row"] = df_cal_view["Icono"] + " · " + df_cal_view["Cliente"].str.title().str[:30]
 
         table_data = (
-            summary_mat
-            .groupby(["Técnico", "Fecha_str"])["Tag"]
+            df_cal_view
+            .groupby(["Técnico", "Fecha_str"])["Tag_row"]
             .apply(lambda x: " | ".join(x))
             .reset_index()
         )
@@ -370,7 +400,7 @@ with tab3:
         try:
             pivot_table = (
                 table_data
-                .pivot_table(index="Técnico", columns="Fecha_str", values="Tag", aggfunc="first")
+                .pivot_table(index="Técnico", columns="Fecha_str", values="Tag_row", aggfunc="first")
                 .fillna("-")
                 .reset_index()
             )
