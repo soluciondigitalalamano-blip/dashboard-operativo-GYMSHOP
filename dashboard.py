@@ -100,15 +100,21 @@ def load_data():
     # Ventas semanales
     df_ventas = pd.read_csv(DATA_DIR / "ventas.csv")
     df_ventas.columns = df_ventas.columns.str.strip()
-    df_ventas["Fecha"] = pd.to_datetime(df_ventas["Fecha"])
-    df_ventas["Venta_num"] = (
-        df_ventas["Venta día"]
-        .str.replace("COP", "", regex=False)
-        .str.replace(".", "", regex=False)
-        .str.replace(",", ".", regex=False)
-        .str.strip()
-        .astype(float)
-    )
+    df_ventas = df_ventas.dropna(subset=["Factura periodo"])
+    df_ventas = df_ventas[df_ventas["Factura periodo"].str.strip() != ""]
+    df_ventas["Fecha"] = pd.to_datetime(df_ventas["Fecha"], errors="coerce")
+    # Soporta columna numérica directa O texto con formato COP
+    if pd.api.types.is_numeric_dtype(df_ventas["Venta día"]):
+        df_ventas["Venta_num"] = df_ventas["Venta día"].astype(float)
+    else:
+        df_ventas["Venta_num"] = (
+            df_ventas["Venta día"]
+            .str.replace("COP", "", regex=False)
+            .str.replace(".", "", regex=False)
+            .str.replace(",", ".", regex=False)
+            .str.strip()
+            .astype(float)
+        )
 
     # Calcular % de visitas vs agenda (evitar división por cero)
     df_ops["% Cumplimiento"] = df_ops.apply(
@@ -481,3 +487,4 @@ with tab4:
     if not nc.empty:
         total_nc = nc["Venta_num"].sum()
         st.caption(f"ℹ️ Se excluyeron {len(nc)} nota(s) crédito por un total de ${total_nc:,.0f} COP. No afectan el total facturado.")
+
