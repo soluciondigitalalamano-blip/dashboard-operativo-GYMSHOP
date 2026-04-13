@@ -117,7 +117,7 @@ df_master, df_cal_master, df_tickets, df_ventas = load_data()
 
 # Fecha de corte dinámica: último lunes de los datos del calendario
 fecha_corte = df_cal_master["Fecha"].max()
-fecha_corte_str = fecha_corte.strftime("%-d de %B, %Y") if hasattr(fecha_corte, 'strftime') else str(fecha_corte)
+fecha_corte_str = f"{fecha_corte.day} de {fecha_corte.strftime('%B')} de {fecha_corte.year}" if hasattr(fecha_corte, 'strftime') else str(fecha_corte)
 
 
 # ==========================================
