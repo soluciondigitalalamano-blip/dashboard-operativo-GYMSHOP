@@ -265,7 +265,7 @@ with tab1:
                 min_value=0,
                 max_value=100,
             ),
-            "Gastos": st.column_config.NumberColumn("Gastos (COP)", format="$ %,.0f"),
+            "Gastos": st.column_config.NumberColumn("Gastos (COP)", format="$ {:,.0f}"),
             "Cantidad de ventas reportada": st.column_config.NumberColumn("Ventas", format="%d"),
             "Servicios agendados esta semana": st.column_config.NumberColumn("Agenda próx. semana", format="%d"),
         },
