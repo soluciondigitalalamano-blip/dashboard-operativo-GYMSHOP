@@ -75,7 +75,7 @@ DATA_DIR = next(
     Path(os.getcwd())
 )
 
-@st.cache_data(ttl=300)  # Refresca cada 5 minutos si el archivo cambia
+@st.cache_data(ttl=0)
 def load_data():
     df_ops = pd.read_csv(DATA_DIR / "operaciones.csv")
     df_cal = pd.read_csv(DATA_DIR / "calendario.csv")
