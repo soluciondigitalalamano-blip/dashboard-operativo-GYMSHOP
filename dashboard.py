@@ -75,7 +75,7 @@ DATA_DIR = next(
     Path(os.getcwd())
 )
 
-@st.cache_data(ttl=300)  # Refresca cada 5 minutos si el archivo cambia
+@st.cache_data(ttl=0)
 def load_data():
     df_ops = pd.read_csv(DATA_DIR / "operaciones.csv")
     df_cal = pd.read_csv(DATA_DIR / "calendario.csv")
@@ -86,6 +86,11 @@ def load_data():
     }
     def _parse_fecha(s):
         s = str(s).lower().strip()
+        # Intentar primero formato ISO (YYYY-MM-DD)
+        resultado = pd.to_datetime(s, format="%Y-%m-%d", errors="coerce")
+        if pd.notna(resultado):
+            return resultado
+        # Luego intentar formato español: "14 de abril de 2026"
         for m, n in _meses.items():
             s = s.replace(f" de {m} de ", f"/{n}/")
         return pd.to_datetime(s, format="%d/%m/%Y", errors="coerce")
@@ -117,7 +122,7 @@ df_master, df_cal_master, df_tickets, df_ventas = load_data()
 
 # Fecha de corte dinámica: último lunes de los datos del calendario
 fecha_corte = df_cal_master["Fecha"].max()
-fecha_corte_str = fecha_corte.strftime("%-d de %B, %Y") if hasattr(fecha_corte, 'strftime') else str(fecha_corte)
+fecha_corte_str = f"{fecha_corte.day} de {fecha_corte.strftime('%B')} de {fecha_corte.year}" if hasattr(fecha_corte, 'strftime') else str(fecha_corte)
 
 
 # ==========================================
@@ -265,7 +270,7 @@ with tab1:
                 min_value=0,
                 max_value=100,
             ),
-            "Gastos": st.column_config.NumberColumn("Gastos (COP)", format="$ %d"),
+            "Gastos": st.column_config.NumberColumn("Gastos (COP)", format="$ {:,.0f}"),
             "Cantidad de ventas reportada": st.column_config.NumberColumn("Ventas", format="%d"),
             "Servicios agendados esta semana": st.column_config.NumberColumn("Agenda próx. semana", format="%d"),
         },
