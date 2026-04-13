@@ -86,6 +86,11 @@ def load_data():
     }
     def _parse_fecha(s):
         s = str(s).lower().strip()
+        # Intentar primero formato ISO (YYYY-MM-DD)
+        resultado = pd.to_datetime(s, format="%Y-%m-%d", errors="coerce")
+        if pd.notna(resultado):
+            return resultado
+        # Luego intentar formato español: "14 de abril de 2026"
         for m, n in _meses.items():
             s = s.replace(f" de {m} de ", f"/{n}/")
         return pd.to_datetime(s, format="%d/%m/%Y", errors="coerce")
