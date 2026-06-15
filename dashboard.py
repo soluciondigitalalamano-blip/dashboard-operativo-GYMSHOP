@@ -86,11 +86,6 @@ def load_data():
     }
     def _parse_fecha(s):
         s = str(s).lower().strip()
-        # Intentar primero formato ISO (YYYY-MM-DD)
-        resultado = pd.to_datetime(s, format="%Y-%m-%d", errors="coerce")
-        if pd.notna(resultado):
-            return resultado
-        # Luego intentar formato español: "14 de abril de 2026"
         for m, n in _meses.items():
             s = s.replace(f" de {m} de ", f"/{n}/")
         return pd.to_datetime(s, format="%d/%m/%Y", errors="coerce")
@@ -100,21 +95,26 @@ def load_data():
     # Ventas semanales
     df_ventas = pd.read_csv(DATA_DIR / "ventas.csv")
     df_ventas.columns = df_ventas.columns.str.strip()
-    df_ventas = df_ventas.dropna(subset=["Factura periodo"])
-    df_ventas = df_ventas[df_ventas["Factura periodo"].str.strip() != ""]
-    df_ventas["Fecha"] = pd.to_datetime(df_ventas["Fecha"], errors="coerce")
-    # Soporta columna numérica directa O texto con formato COP
-    if pd.api.types.is_numeric_dtype(df_ventas["Venta día"]):
-        df_ventas["Venta_num"] = df_ventas["Venta día"].astype(float)
-    else:
+    df_ventas["Fecha"] = pd.to_datetime(df_ventas["Fecha"], dayfirst=True, errors="coerce")
+
+    # Venta_num puede venir ya calculada o en columna "Venta día" como texto
+    if "Venta_num" in df_ventas.columns and pd.api.types.is_numeric_dtype(df_ventas["Venta_num"]):
+        pass  # ya está lista
+    elif "Venta_num" in df_ventas.columns:
+        df_ventas["Venta_num"] = pd.to_numeric(df_ventas["Venta_num"], errors="coerce").fillna(0)
+    elif "Venta día" in df_ventas.columns:
         df_ventas["Venta_num"] = (
             df_ventas["Venta día"]
+            .astype(str)
             .str.replace("COP", "", regex=False)
+            .str.replace("$", "", regex=False)
             .str.replace(".", "", regex=False)
             .str.replace(",", ".", regex=False)
             .str.strip()
-            .astype(float)
         )
+        df_ventas["Venta_num"] = pd.to_numeric(df_ventas["Venta_num"], errors="coerce").fillna(0)
+    else:
+        df_ventas["Venta_num"] = 0
 
     # Calcular % de visitas vs agenda (evitar división por cero)
     df_ops["% Cumplimiento"] = df_ops.apply(
@@ -128,7 +128,7 @@ df_master, df_cal_master, df_tickets, df_ventas = load_data()
 
 # Fecha de corte dinámica: último lunes de los datos del calendario
 fecha_corte = df_cal_master["Fecha"].max()
-fecha_corte_str = f"{fecha_corte.day} de {fecha_corte.strftime('%B')} de {fecha_corte.year}" if hasattr(fecha_corte, 'strftime') else str(fecha_corte)
+fecha_corte_str = fecha_corte.strftime("%-d de %B, %Y") if hasattr(fecha_corte, 'strftime') else str(fecha_corte)
 
 
 # ==========================================
