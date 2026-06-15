@@ -95,7 +95,17 @@ def load_data():
     # Ventas semanales
     df_ventas = pd.read_csv(DATA_DIR / "ventas.csv")
     df_ventas.columns = df_ventas.columns.str.strip()
-    df_ventas["Fecha"] = pd.to_datetime(df_ventas["Fecha"], dayfirst=True, errors="coerce")
+    # Parsear fechas en español: "10 de junio de 2026"
+    _meses_v = {
+        "enero":"01","febrero":"02","marzo":"03","abril":"04","mayo":"05","junio":"06",
+        "julio":"07","agosto":"08","septiembre":"09","octubre":"10","noviembre":"11","diciembre":"12"
+    }
+    def _parse_fecha_v(s):
+        s = str(s).lower().strip()
+        for m, n in _meses_v.items():
+            s = s.replace(f" de {m} de ", f"/{n}/")
+        return pd.to_datetime(s, format="%d/%m/%Y", errors="coerce")
+    df_ventas["Fecha"] = df_ventas["Fecha"].apply(_parse_fecha_v)
 
     # Venta_num puede venir ya calculada o en columna "Venta día" como texto
     if "Venta_num" in df_ventas.columns and pd.api.types.is_numeric_dtype(df_ventas["Venta_num"]):
