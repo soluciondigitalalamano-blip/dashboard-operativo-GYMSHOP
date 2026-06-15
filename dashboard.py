@@ -106,6 +106,7 @@ def load_data():
             s = s.replace(f" de {m} de ", f"/{n}/")
         return pd.to_datetime(s, format="%d/%m/%Y", errors="coerce")
     df_ventas["Fecha"] = df_ventas["Fecha"].apply(_parse_fecha_v)
+    df_ventas["Ciudad"] = df_ventas["Ciudad"].fillna("Sin ciudad").str.strip().replace("", "Sin ciudad")
 
     # Venta_num puede venir ya calculada o en columna "Venta día" como texto
     if "Venta_num" in df_ventas.columns and pd.api.types.is_numeric_dtype(df_ventas["Venta_num"]):
@@ -286,7 +287,7 @@ with tab1:
                 min_value=0,
                 max_value=100,
             ),
-            "Gastos": st.column_config.NumberColumn("Gastos (COP)", format="$ {:,.0f}"),
+            "Gastos": st.column_config.NumberColumn("Gastos (COP)", format="$ %d"),
             "Cantidad de ventas reportada": st.column_config.NumberColumn("Ventas", format="%d"),
             "Servicios agendados esta semana": st.column_config.NumberColumn("Agenda próx. semana", format="%d"),
         },
